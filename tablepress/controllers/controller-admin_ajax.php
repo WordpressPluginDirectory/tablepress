@@ -171,6 +171,7 @@ class TablePress_Admin_AJAX_Controller extends TablePress_Controller {
 			'message' => $message,
 		);
 		if ( $success ) {
+			// For the phpstan ignores in the next lines: If this is reached, $table is guaranteed to exist and is a valid array.
 			$response['table_id'] = $table['id']; // @phpstan-ignore-line
 			$response['new_edit_nonce'] = wp_create_nonce( TablePress::nonce( 'edit', $table['id'] ) ); // @phpstan-ignore-line
 			$response['new_preview_nonce'] = wp_create_nonce( TablePress::nonce( 'preview_table', $table['id'] ) ); // @phpstan-ignore-line
@@ -266,10 +267,12 @@ class TablePress_Admin_AJAX_Controller extends TablePress_Controller {
 			$default_render_options = $_render->get_default_render_options();
 			/** This filter is documented in controllers/controller-frontend.php */
 			$default_render_options = apply_filters( 'tablepress_shortcode_table_default_shortcode_atts', $default_render_options );
+			// For the phpstan ignores in the next lines: If this is reached, $table is guaranteed to exist and is a valid array.
 			$render_options = shortcode_atts( $default_render_options, $table['options'] ); // @phpstan-ignore-line
 			/** This filter is documented in controllers/controller-frontend.php */
 			$render_options = apply_filters( 'tablepress_shortcode_table_shortcode_atts', $render_options );
 			$render_options['html_id'] = "tablepress-{$table['id']}"; // @phpstan-ignore-line
+			$render_options['block_preview'] = true;
 			$_render->set_input( $table, $render_options ); // @phpstan-ignore-line
 			$head_html = $_render->get_preview_css();
 			$custom_css = TablePress::$model_options->get( 'custom_css' );
@@ -281,7 +284,7 @@ class TablePress_Admin_AJAX_Controller extends TablePress_Controller {
 			$body_html = '<div id="tablepress-page"><p>'
 				. __( 'This is a preview of your table.', 'tablepress' ) . ' '
 				. __( 'Because of CSS styling in your theme, the table might look different on your page!', 'tablepress' ) . ' '
-				. __( 'The Table Features for Site Visitors, like sorting, filtering, and pagination, are also not available in this preview!', 'tablepress' ) . '<br />';
+				. __( 'The Table Features for Site Visitors, like sorting, filtering, and pagination, are also not available in this preview!', 'tablepress' ) . '<br>';
 			// Show the instructions string depending on whether the Block Editor is used on the site or not.
 			if ( TablePress::site_uses_block_editor() ) {
 				$body_html .= sprintf( __( 'To insert a table into a post or page, add a “%1$s” block in the block editor and select the desired table.', 'tablepress' ), __( 'TablePress table', 'tablepress' ) );

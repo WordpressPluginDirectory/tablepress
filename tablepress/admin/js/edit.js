@@ -22,7 +22,6 @@ import { buildQueryString } from '@wordpress/url';
  */
 import { $ } from './common/functions';
 import contextMenu from './edit/contextmenu';
-import naturalSort from './edit/naturalsort';
 
 // Ensure the global `tp` object exists.
 window.tp = window.tp || {};
@@ -141,7 +140,11 @@ tp.helpers.options.change = function ( event ) {
 
 	// Save numeric options as numbers.
 	if ( event.target instanceof HTMLInputElement && 'number' === event.target.type ) {
-		tp.table.options[ option_name ] = parseInt( tp.table.options[ option_name ], 10 );
+		if ( tp.table.options[ option_name ].includes( '.' ) ) {
+			tp.table.options[ option_name ] = parseFloat( tp.table.options[ option_name ] );
+		} else {
+			tp.table.options[ option_name ] = parseInt( tp.table.options[ option_name ], 10 );
+		}
 	}
 
 	// Turn off "Enable Visitor Features" if the table has merged cells.
@@ -391,7 +394,11 @@ tp.helpers.editor.sorting = function( direction ) {
 	direction = direction ? -1 : 1;
 	return function( a, b ) {
 		// The actual value is stored in the second array element, the first contains the row index.
-		return direction * naturalSort( a[1], b[1] );
+		const sortResult = a[1].localeCompare( b[1], undefined, {
+			numeric: true,
+			sensitivity: 'base'
+		} );
+		return direction * sortResult;
 	};
 };
 
@@ -764,7 +771,7 @@ tp.callbacks.table_preview.process = function ( event ) {
 	};
 
 	// Add spinner, disable "Preview" buttons, and change cursor.
-	event.target.parentNode.insertAdjacentHTML( 'beforeend', `<span id="spinner-table-preview" class="spinner-table-preview spinner is-active" title="${ __( 'The Table Preview is being loaded …', 'tablepress' ) }"/>` );
+	event.target.parentNode.insertAdjacentHTML( 'beforeend', `<span id="spinner-table-preview" class="spinner-table-preview spinner is-active" title="${ __( 'The Table Preview is being loaded …', 'tablepress' ) }"></span>` );
 	$( '.button-preview' ).forEach( ( button ) => button.classList.add( 'disabled' ) );
 	document.body.classList.add( 'wait' );
 
@@ -871,7 +878,7 @@ tp.callbacks.save_changes.process = function ( event ) {
 	};
 
 	// Add spinner, disable "Save Changes" buttons, and change cursor.
-	event.target.parentNode.insertAdjacentHTML( 'beforeend', `<span id="spinner-save-changes" class="spinner-save-changes spinner is-active" title="${ __( 'Changes are being saved …', 'tablepress' ) }"/>` );
+	event.target.parentNode.insertAdjacentHTML( 'beforeend', `<span id="spinner-save-changes" class="spinner-save-changes spinner is-active" title="${ __( 'Changes are being saved …', 'tablepress' ) }"></span>` );
 	$( '.button-save-changes' ).forEach( ( button ) => ( button.disabled = true ) );
 	document.body.classList.add( 'wait' );
 
@@ -1070,7 +1077,7 @@ tp.callbacks.screen_options.save = function ( event ) {
 	};
 
 	// Add spinner and change cursor.
-	event.target.parentNode.insertAdjacentHTML( 'beforeend', `<span id="spinner-save-changes" class="spinner-save-changes spinner is-active" title="${ __( 'Changes are being saved …', 'tablepress' ) }"/>` );
+	event.target.parentNode.insertAdjacentHTML( 'beforeend', `<span id="spinner-save-changes" class="spinner-save-changes spinner is-active" title="${ __( 'Changes are being saved …', 'tablepress' ) }"></span>` );
 	document.body.classList.add( 'wait' );
 
 	// Save the table data to the server via an AJAX request.
@@ -1586,9 +1593,11 @@ document.querySelectorAll( '#tablepress-body .button-module-help' ).forEach( ( $
 
 // Register callbacks for the screen options.
 const $tablepress_screen_options = $( '#tablepress-screen-options' );
-$tablepress_screen_options.addEventListener( 'input', tp.callbacks.screen_options.update );
-$tablepress_screen_options.addEventListener( 'change', tp.callbacks.screen_options.set_was_changed );
-$tablepress_screen_options.addEventListener( 'focusout', tp.callbacks.screen_options.save ); // Use the `focusout` event instead of `blur` as that does not bubble.
+if ( $tablepress_screen_options ) {
+	$tablepress_screen_options.addEventListener( 'input', tp.callbacks.screen_options.update );
+	$tablepress_screen_options.addEventListener( 'change', tp.callbacks.screen_options.set_was_changed );
+	$tablepress_screen_options.addEventListener( 'focusout', tp.callbacks.screen_options.save ); // Use the `focusout` event instead of `blur` as that does not bubble.
+}
 
 // Register keyboard shortcut handler.
 window.addEventListener( 'keydown', tp.callbacks.keyboard_shortcuts, true );

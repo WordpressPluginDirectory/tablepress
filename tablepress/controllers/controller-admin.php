@@ -105,12 +105,16 @@ class TablePress_Admin_Controller extends TablePress_Controller {
 					$position = 3; // Position of Dashboard + 1.
 					break;
 				case 'bottom':
-					$position = ( ++$GLOBALS['_wp_last_utility_menu'] );
+					$position = isset( $GLOBALS['_wp_last_utility_menu'] ) ? ++$GLOBALS['_wp_last_utility_menu'] : 80;
 					break;
 				case 'middle':
 				default:
-					$position = ( ++$GLOBALS['_wp_last_object_menu'] );
+					$position = isset( $GLOBALS['_wp_last_object_menu'] ) ? ++$GLOBALS['_wp_last_object_menu'] : 25;
 					break;
+			}
+			// Prevent overwriting existing menu entries.
+			while ( isset( $GLOBALS['menu'][ $position ] ) ) {
+				++$position;
 			}
 			add_menu_page( 'TablePress', $admin_menu_entry_name, $min_access_cap, 'tablepress', $callback, $icon_url, $position ); // @phpstan-ignore-line
 			foreach ( $this->view_actions as $action => $entry ) {
@@ -221,10 +225,16 @@ class TablePress_Admin_Controller extends TablePress_Controller {
 		foreach ( $table_ids as $table_id ) {
 			// Load table, without table data, options, and visibility settings.
 			$table = TablePress::$model_table->load( $table_id, false, false );
-			if ( '' === trim( $table['name'] ) ) { // @phpstan-ignore-line
-				$table['name'] = __( '(no name)', 'tablepress' ); // @phpstan-ignore-line
+
+			// Skip tables that could not be loaded.
+			if ( is_wp_error( $table ) ) {
+				continue;
 			}
-			$tables[ $table_id ] = esc_html( $table['name'] ); // @phpstan-ignore-line
+
+			if ( '' === trim( $table['name'] ) ) {
+				$table['name'] = __( '(no name)', 'tablepress' );
+			}
+			$tables[ $table_id ] = esc_html( $table['name'] );
 		}
 
 		/**
@@ -236,24 +246,24 @@ class TablePress_Admin_Controller extends TablePress_Controller {
 		 */
 		$tables = apply_filters( 'tablepress_block_editor_tables_list', $tables );
 
-		$tables = wp_json_encode( $tables, TABLEPRESS_JSON_OPTIONS );
+		$tables = wp_json_encode( $tables, JSON_HEX_TAG | JSON_UNESCAPED_SLASHES );
 		if ( false === $tables ) {
 			// JSON encoding failed, return an error object. Use a prefixed "_error" key to avoid conflicts with intentionally added "error" keys.
 			$tables = '{ "_error": "The data could not be encoded to JSON!" }';
 		}
-		// Print them inside a `JSON.parse()` call in JS for speed gains, with necessary escaping of `</script>`, `'`, and `\`.
-		$tables = str_replace( array( '</script>', '\\', "'" ), array( '<\/script>', '\\\\', "\'" ), $tables );
+		// Print the JSON data inside a `JSON.parse()` call in JS for speed gains, with necessary escaping of `\` and `'`.
+		$tables = str_replace( array( '\\', "'" ), array( '\\\\', "\'" ), $tables );
 
 		$shortcode = esc_js( TablePress::$shortcode );
 
 		$template = TablePress::$model_table->get_table_template();
-		$template = wp_json_encode( $template['options'], TABLEPRESS_JSON_OPTIONS );
+		$template = wp_json_encode( $template['options'], JSON_HEX_TAG | JSON_UNESCAPED_SLASHES );
 		if ( false === $template ) {
 			// JSON encoding failed, return an error object. Use a prefixed "_error" key to avoid conflicts with intentionally added "error" keys.
 			$template = '{ "_error": "The data could not be encoded to JSON!" }';
 		}
-		// Print them inside a `JSON.parse()` call in JS for speed gains, with necessary escaping of `</script>`, `'`, and `\`.
-		$template = str_replace( array( '</script>', '\\', "'" ), array( '<\/script>', '\\\\', "\'" ), $template );
+		// Print the JSON data inside a `JSON.parse()` call in JS for speed gains, with necessary escaping of `\` and `'`.
+		$template = str_replace( array( '\\', "'" ), array( '\\\\', "\'" ), $template );
 
 		/**
 		 * Filters whether the table block preview should be loaded via a <ServerSideRender> in the block editor.
@@ -379,6 +389,18 @@ JS;
 		// Add additional links on Plugins page.
 		add_filter( 'plugin_action_links_' . TABLEPRESS_BASENAME, array( $this, 'add_plugin_action_links' ) );
 		add_filter( 'plugin_row_meta', array( $this, 'add_plugin_row_meta' ), 10, 2 );
+		$incompatible_superseded_extensions = array(
+			'tablepress-datatables-alphabetsearch/tablepress-datatables-alphabetsearch.php',
+			'tablepress-datatables-column-filter-widgets/tablepress-datatables-column-filter-widgets.php',
+			'tablepress-datatables-columnfilter/tablepress-datatables-columnfilter.php',
+			'tablepress-datatables-fixedcolumns/tablepress-datatables-fixedcolumns.php',
+			'tablepress-datatables-row-details/tablepress-datatables-row-details.php',
+			'tablepress-datatables-rowgroup/tablepress-datatables-rowgroup.php',
+			'tablepress-responsive-tables/tablepress-responsive-tables.php',
+		);
+		foreach ( $incompatible_superseded_extensions as $plugin_file ) {
+			add_action( "after_plugin_row_{$plugin_file}", array( $this, 'add_superseded_extension_meta_row' ), 10, 3 );
+		}
 	}
 
 	/**
@@ -391,7 +413,7 @@ JS;
 	 */
 	public function add_plugin_action_links( array $links ): array {
 		if ( current_user_can( 'tablepress_list_tables' ) ) {
-			$links[] = '<a href="' . TablePress::url() . '">' . __( 'Plugin page', 'tablepress' ) . '</a>';
+			$links[] = '<a href="' . esc_url( TablePress::url() ) . '">' . __( 'Plugin page', 'tablepress' ) . '</a>';
 		}
 		return $links;
 	}
@@ -418,6 +440,52 @@ JS;
 	}
 
 	/**
+	 * Prints a superseded extension notice below certain TablePress Extension plugins' meta rows on the "Plugins" screen.
+	 *
+	 * @since 2.4.1
+	 *
+	 * @param string                           $plugin_file Path to the plugin file relative to the plugins directory.
+	 * @param array<int, string|string[]|bool> $plugin_data An array of plugin data.
+	 * @param string                           $status      Status filter currently applied to the plugin list.
+	 */
+	public function add_superseded_extension_meta_row( string $plugin_file, array $plugin_data, string $status ): void {
+		if ( ! is_plugin_active( $plugin_file ) ) {
+			return;
+		}
+		?>
+		<tr class="plugin-update-tr active">
+			<td colspan="<?php echo esc_attr( $GLOBALS['wp_list_table']->get_column_count() ); ?>" class="plugin-update colspanchange">
+				<div class="update-message notice inline notice-error notice-alt">
+					<?php
+					if ( tb_tp_fs()->is_free_plan() ) {
+						echo '<p style="font-size:14px;">';
+						_e( 'This TablePress Extension was retired.', 'tablepress' );
+						echo ' ';
+						_e( '<strong>The plugin will stop working with TablePress 3 later this year</strong> and will no longer receive updates or support!', 'tablepress' );
+						echo '<br>';
+						_e( 'Keeping it activated can lead to errors on your website!', 'tablepress' );
+						echo ' <strong>' . sprintf( __( '<a href="%s">Find out what you can do to continue using its features!</a>', 'tablepress' ), 'https://tablepress.org/upgrade-extensions/?utm_source=plugin&utm_medium=textlink&utm_content=plugins-list-table' ) . '</strong>';
+						echo '</p>';
+					}
+					?>
+					<style>
+						/* Remove the separator line between the plugin's and the notice's table row. */
+						.plugins .active[data-plugin="<?php echo $plugin_file; ?>"] th,
+						.plugins .active[data-plugin="<?php echo $plugin_file; ?>"] td {
+							box-shadow: none;
+						}
+						/* Hide the plugin update row for the Extension as those won't work anymore anyways. */
+						.plugins .plugin-update-tr[data-plugin="<?php echo $plugin_file; ?>"] {
+							display: none;
+						}
+					</style>
+				</div>
+			</td>
+		</tr>
+		<?php
+	}
+
+	/**
 	 * Prepare the rendering of an admin screen, by determining the current action, loading necessary data and initializing the view.
 	 *
 	 * @since 1.0.0
@@ -434,7 +502,7 @@ JS;
 		}
 
 		// Check if action is a supported action, and whether the user is allowed to access this screen.
-		if ( ! isset( $this->view_actions[ $action ] ) || ! current_user_can( $this->view_actions[ $action ]['required_cap'] ) ) { // @phpstan-ignore-line
+		if ( ! isset( $this->view_actions[ $action ] ) || ! current_user_can( $this->view_actions[ $action ]['required_cap'] ) ) { // @phpstan-ignore-line (The array value for the capability is always a string.)
 			wp_die( __( 'Sorry, you are not allowed to access this page.', 'default' ), 403 );
 		}
 
@@ -468,9 +536,10 @@ JS;
 				$data['table_id'] = ( ! empty( $_GET['table_id'] ) ) ? $_GET['table_id'] : false;
 				// Prime the post meta cache for cached loading of last_editor.
 				$data['table_ids'] = TablePress::$model_table->load_all( true );
-				$data['messages']['donation_message'] = $this->maybe_show_donation_message();
-				$data['messages']['first_visit'] = ! $data['messages']['donation_message'] && TablePress::$model_options->get( 'message_first_visit' );
-				$data['messages']['plugin_update_message'] = TablePress::$model_options->get( 'message_plugin_update' );
+				$data['messages']['donation_nag'] = $this->maybe_show_donation_message();
+				$data['messages']['first_visit'] = ! $data['messages']['donation_nag'] && TablePress::$model_options->get( 'message_first_visit' );
+				$data['messages']['plugin_update'] = TablePress::$model_options->get( 'message_plugin_update' );
+				$data['messages']['superseded_extensions'] = TablePress::$model_options->get( 'message_superseded_extensions' );
 				$data['table_count'] = count( $data['table_ids'] );
 				break;
 			case 'about':
@@ -531,7 +600,13 @@ JS;
 					}
 					// Load table, without table data, options, and visibility settings.
 					$table = TablePress::$model_table->load( $table_id, false, false );
-					$data['tables'][ $table['id'] ] = $table['name']; // @phpstan-ignore-line
+
+					// Skip tables that could not be loaded.
+					if ( is_wp_error( $table ) ) {
+						continue;
+					}
+
+					$data['tables'][ $table['id'] ] = $table['name'];
 				}
 				$data['tables_count'] = TablePress::$model_table->count_tables();
 				$data['export_ids'] = ( ! empty( $_GET['table_id'] ) ) ? explode( ',', $_GET['table_id'] ) : array();
@@ -552,7 +627,13 @@ JS;
 					}
 					// Load table, without table data, options, and visibility settings.
 					$table = TablePress::$model_table->load( $table_id, false, false );
-					$data['tables'][ $table['id'] ] = $table['name']; // @phpstan-ignore-line
+
+					// Skip tables that could not be loaded.
+					if ( is_wp_error( $table ) ) {
+						continue;
+					}
+
+					$data['tables'][ $table['id'] ] = $table['name'];
 				}
 				$data['table_ids'] = $table_ids; // Backward compatibility for the retired "Table Auto Update" Extension, which still relies on this variable name.
 				$data['tables_count'] = TablePress::$model_table->count_tables();
@@ -1092,6 +1173,13 @@ JS;
 			}
 		}
 
+		// For security reasons, the "url" source is only available admins and editors via a custom capability.
+		if ( 'url' === $import_config['source'] ) {
+			if ( ! current_user_can( 'tablepress_import_tables_url' ) ) {
+				TablePress::redirect( array( 'action' => 'import', 'message' => 'error_import', 'error_details' => 'You do not have the required access rights.' ) );
+			}
+		}
+
 		// Move file upload data to the main import configuration.
 		$import_config['file-upload'] = $_FILES['import_file_upload'] ?? null;
 
@@ -1292,6 +1380,7 @@ JS;
 		/** This filter is documented in controllers/controller-frontend.php */
 		$render_options = apply_filters( 'tablepress_shortcode_table_shortcode_atts', $render_options );
 		$render_options['html_id'] = "tablepress-{$table['id']}";
+		$render_options['block_preview'] = true;
 		$_render->set_input( $table, $render_options );
 		$view_data = array(
 			'table_id'               => $table_id,
@@ -1362,7 +1451,7 @@ JS;
 		TablePress::$model_table->destroy();
 		TablePress::$model_options->destroy();
 
-		$output = '<strong>' . __( 'TablePress was uninstalled successfully.', 'tablepress' ) . '</strong><br /><br />';
+		$output = '<strong>' . __( 'TablePress was uninstalled successfully.', 'tablepress' ) . '</strong><br><br>';
 		$output .= __( 'All tables, data, and options were deleted.', 'tablepress' );
 		if ( is_multisite() ) {
 			$output .= ' ' . __( 'You may now ask the network admin to delete the plugin&#8217;s folder <code>tablepress</code> from the server, if no other site in the network uses it.', 'tablepress' );

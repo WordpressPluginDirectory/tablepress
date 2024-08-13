@@ -51,11 +51,12 @@ class TablePress_Options_Model extends TablePress_Model {
 	 * @var array<string, mixed>>
 	 */
 	protected $default_user_options = array(
-		'user_options_db_version'   => TablePress::db_version, // To prevent saving on first load.
-		'admin_menu_parent_page'    => 'middle',
-		'message_first_visit'       => true,
-		'table_editor_column_width' => '170', // Default column width of 170px of the table editor on the "Edit" screen.
-		'table_editor_line_clamp'   => '5', // Maximum number of lines per cell in the table editor on the "Edit" screen.
+		'user_options_db_version'       => TablePress::db_version, // To prevent saving on first load.
+		'admin_menu_parent_page'        => 'middle',
+		'message_first_visit'           => true,
+		'message_superseded_extensions' => true,
+		'table_editor_column_width'     => '170', // Default column width of 170px of the table editor on the "Edit" screen.
+		'table_editor_line_clamp'       => '5', // Maximum number of lines per cell in the table editor on the "Edit" screen.
 	);
 
 	/**
@@ -208,7 +209,7 @@ class TablePress_Options_Model extends TablePress_Model {
 	}
 
 	/**
-	 * Add default capabilities to "Administrator", "Editor", and "Author" user roles.
+	 * Adds the TablePress default capabilities to the "Administrator", "Editor", and "Author" user roles.
 	 *
 	 * @since 1.0.0
 	 */
@@ -241,6 +242,30 @@ class TablePress_Options_Model extends TablePress_Model {
 		$role = get_role( 'administrator' );
 		if ( ! empty( $role ) ) {
 			$role->add_cap( 'tablepress_edit_options' );
+			$role->add_cap( 'tablepress_import_tables_url' );
+		}
+		$role = get_role( 'editor' );
+		if ( ! empty( $role ) ) {
+			$role->add_cap( 'tablepress_import_tables_url' );
+		}
+
+		// Refresh current set of capabilities of the user, to be able to directly use the new caps.
+		$user = wp_get_current_user();
+		$user->get_role_caps();
+	}
+
+	/**
+	 * Adds a custom "Import from URL" access capability to the "Editor" and "Administrator" user roles.
+	 *
+	 * @since 2.3.2
+	 */
+	public function add_access_capabilities_tp232(): void {
+		$roles = array( 'administrator', 'editor' );
+		foreach ( $roles as $role ) {
+			$role = get_role( $role );
+			if ( ! empty( $role ) ) {
+				$role->add_cap( 'tablepress_import_tables_url' );
+			}
 		}
 
 		// Refresh current set of capabilities of the user, to be able to directly use the new caps.

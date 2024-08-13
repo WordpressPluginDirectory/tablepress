@@ -99,6 +99,7 @@ class TablePress_Import_View extends TablePress_View {
 			'importFormField'        => $this->admin_page->convert_to_json_parse_output( $data['import_form-field'] ),
 			'importExistingTable'    => $this->admin_page->convert_to_json_parse_output( $data['import_existing_table'] ),
 			'showImportSourceServer' => ( ( ! is_multisite() && current_user_can( 'manage_options' ) ) || is_super_admin() ) ? 'true' : 'false',
+			'showImportSourceUrl'    => current_user_can( 'tablepress_import_tables_url' ) ? 'true' : 'false',
 			'legacyImport'           => $this->admin_page->convert_to_json_parse_output( $data['legacy_import'] ),
 		);
 
@@ -157,7 +158,7 @@ class TablePress_Import_View extends TablePress_View {
 	 */
 	public function wp_pointer_tp20_import_drag_drop_detect_format(): void {
 		$content  = '<h3>' . __( 'TablePress feature: Drag and Drop Import with Format Detection', 'tablepress' ) . '</h3>';
-		$content .= '<p>' . __( 'Did you know?', 'tablepress' ) . ' ' . __( 'The import of tables is now even more powerful! You can simply drag and drop your files into this area and TablePress will automatically detect the file format!', 'tablepress' ) . '</p>';
+		$content .= '<p>' . __( 'Did you know?', 'tablepress' ) . ' ' . __( 'To import tables, you can simply drag and drop your spreadsheet files into this area and TablePress will automatically detect the file format!', 'tablepress' ) . '</p>';
 
 		$this->admin_page->print_wp_pointer_js(
 			'tp20_import_drag_drop_detect_format',

@@ -86,13 +86,14 @@ abstract class TablePress_Controller {
 				// Update Plugin Options Options, if necessary.
 				TablePress::$model_options->merge_plugin_options_defaults();
 				$updated_options = array(
-					'plugin_options_db_version' => TablePress::db_version,
-					'prev_tablepress_version'   => TablePress::$model_options->get( 'tablepress_version' ),
-					'tablepress_version'        => TablePress::version,
-					'message_plugin_update'     => true,
+					'plugin_options_db_version'     => TablePress::db_version,
+					'prev_tablepress_version'       => TablePress::$model_options->get( 'tablepress_version' ),
+					'tablepress_version'            => TablePress::version,
+					'message_plugin_update'         => true,
+					'message_superseded_extensions' => true,
 				);
 
-				// Only write files, if "Custom CSS" is to be used, and if there is "Custom CSS".
+				// Only write files if "Custom CSS" is to be used, and if there is "Custom CSS".
 				if ( TablePress::$model_options->get( 'use_custom_css' ) && '' !== TablePress::$model_options->get( 'custom_css' ) ) {
 					// Re-save "Custom CSS" to re-create all files (as TablePress Default CSS might have changed).
 					/**
@@ -121,6 +122,11 @@ abstract class TablePress_Controller {
 				// Add mime type field to existing posts with the TablePress Custom Post Type, so that other plugins know that they are not dealing with plain text.
 				if ( $current_plugin_options_db_version < 25 ) {
 					TablePress::$model_table->add_mime_type_to_posts();
+				}
+
+				// Add new access capabilities that were introduced in TablePress 2.3.2.
+				if ( $current_plugin_options_db_version < 77 ) {
+					TablePress::$model_options->add_access_capabilities_tp232();
 				}
 			}
 		}
