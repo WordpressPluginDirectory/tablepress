@@ -10,7 +10,7 @@
 // Load the Sass string module, for use in the `unicode` function.
 @use "sass:string";
 
-/* Load WordPress color schemes, which normally are only loaded on WP admin screens that use the block editor. */
+/* Load WordPress color schemes, which normally are only loaded on WP admin screens that use the block editor. This and the dependency in package.json are only needed for WP < 6.9. */
 @use "~@wordpress/base-styles/colors";
 @use "~@wordpress/base-styles/mixins";
 @include mixins.wordpress-admin-schemes();
@@ -47,20 +47,6 @@ body.wait * {
 
 	#tablepress-body {
 		padding: 0 20px;
-	}
-
-	/* Reset artificial margin/padding for metaboxes, introduced in WP 7.0. */
-	#poststuff #post-body {
-		margin: 0;
-
-		@media only screen and (min-width: 851px) {
-			&.columns-2 {
-				margin-right: 300px;
-			}
-		}
-	}
-	.metabox-holder .postbox-container .meta-box-sortables {
-		padding: 0;
 	}
 
 	/* Metabox titles should have the same height, with and without the "?" button. */
@@ -254,6 +240,9 @@ body.wait * {
 
 	.notice {
 		margin: 20px 0 0;
+
+		/* Remove rounded corners in WP 7.1+, as long as notices still use non-Gutenberg style. */
+		--wpds-border-radius-lg: 0; /* stylelint-disable-line plugin-wpds/no-setting-wpds-custom-properties */
 	}
 
 	.components-notice {
@@ -264,9 +253,6 @@ body.wait * {
 			border-right: none;
 			border-bottom: none;
 
-			&.is-info {
-				border-left-color: var(--wp-components-color-accent, var(--wp-admin-theme-color, #3858e9));
-			}
 
 			&.is-dismissible {
 				padding-right: 38px;
@@ -286,6 +272,9 @@ body.wait * {
 			}
 		}
 
+		&.notice-info {
+			border-left-color: var(--wp-components-color-accent, var(--wp-admin-theme-color, #3858e9));
+		}
 		.components-notice__content {
 			margin: 0;
 		}
@@ -367,7 +356,16 @@ body.wait * {
 	@media screen and (max-width: 782px) {
 		.column-table_id {
 			display: none !important;
+			font-size: 14px;
+		}
+		/* WordPress < 7.1. */
+		th + .column-table_id {
 			padding: 3px 8px 3px 35%;
+		}
+
+		/* WordPress >= 7.1. */
+		td + .column-table_id {
+			padding: 6px 8px 8px 32px;
 		}
 	}
 }
@@ -463,7 +461,7 @@ table.widefat {
 		display: inline-block;
 		vertical-align: top;
 		box-sizing: border-box;
-		margin: 1px 0 -1px 6px;
+		margin: 3px 0 0 6px;
 		padding: 0 5px;
 		min-width: 18px;
 		height: 18px;

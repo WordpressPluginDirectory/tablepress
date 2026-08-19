@@ -2,7 +2,6 @@
 
 namespace TablePress\PhpOffice\PhpSpreadsheet\Reader;
 
-use Closure;
 use TablePress\Composer\Pcre\Preg;
 use DateTime;
 use DateTimeZone;
@@ -282,6 +281,7 @@ class Ods extends BaseReader
 	 *      textRotation?: int,
 	 *      vertical?: string,
 	 *      wrapText?: bool,
+	 *      indent?: int,
 	 *    },
 	 *    protection?:array{
 	 *      locked?: string,
@@ -512,7 +512,7 @@ class Ods extends BaseReader
 				$rowID = 1;
 				$tableColumnIndex = 1;
 				$this->highestDataIndex = AddressRange::MAX_COLUMN_INT;
-				foreach ($worksheetDataSet->childNodes as $childNode) {
+				foreach ($worksheetDataSet->childNodes ?? [] as $childNode) {
 					/** @var DOMElement $childNode */
 
 					// Filter elements which are not under the "table" ns
@@ -643,7 +643,7 @@ class Ods extends BaseReader
 				// Go through every child of table element processing column widths
 				$rowID = 1;
 				$tableColumnIndex = 1;
-				foreach ($worksheetDataSet->childNodes as $childNode) {
+				foreach ($worksheetDataSet->childNodes ?? [] as $childNode) {
 					/** @var DOMElement $childNode */
 					if (empty($columnWidths) || $this->readEmptyCells) {
 						break;
@@ -723,7 +723,7 @@ class Ods extends BaseReader
 		string $xlinkNs,
 		Spreadsheet $spreadsheet
 	): void {
-		foreach ($childNode->childNodes as $grandchildNode) {
+		foreach ($childNode->childNodes ?? [] as $grandchildNode) {
 			/** @var DOMElement $grandchildNode */
 			$grandkey = self::extractNodeName($grandchildNode->nodeName);
 			switch ($grandkey) {
@@ -754,7 +754,7 @@ class Ods extends BaseReader
 		string $xlinkNs,
 		Spreadsheet $spreadsheet
 	): void {
-		foreach ($childNode->childNodes as $grandchildNode) {
+		foreach ($childNode->childNodes ?? [] as $grandchildNode) {
 			/** @var DOMElement $grandchildNode */
 			$grandkey = self::extractNodeName($grandchildNode->nodeName);
 			switch ($grandkey) {
@@ -821,7 +821,7 @@ class Ods extends BaseReader
 
 		$columnID = 'A';
 		/** @var DOMElement|DOMText $cellData */
-		foreach ($childNode->childNodes as $cellData) {
+		foreach ($childNode->childNodes ?? [] as $cellData) {
 			if ($cellData instanceof DOMText) {
 				continue; // should just be whitespace
 			}
@@ -851,7 +851,7 @@ class Ods extends BaseReader
 			// repeated range passes the read filter. If not, skip the entire group.
 			// If some columns pass, we need to fall through to the processing block
 			// which will handle per-column filtering.
-			if (!$this->getReadFilter()->readCell($columnID, $rowID, $worksheetName)) {
+			if (!$this->readFilter->readCell($columnID, $rowID, $worksheetName)) {
 				if ($colRepeats <= 1) {
 					StringHelper::stringIncrement($columnID);
 
@@ -865,7 +865,7 @@ class Ods extends BaseReader
 					if ($i > 0) {
 						StringHelper::stringIncrement($tempCol);
 					}
-					if ($this->getReadFilter()->readCell($tempCol, $rowID, $worksheetName)) {
+					if ($this->readFilter->readCell($tempCol, $rowID, $worksheetName)) {
 						$anyColumnPasses = true;
 
 						break;
@@ -971,7 +971,7 @@ class Ods extends BaseReader
 			/** @var DOMElement[] $paragraphs */
 			$paragraphs = [];
 
-			foreach ($cellData->childNodes as $item) {
+			foreach ($cellData->childNodes ?? [] as $item) {
 				/** @var DOMElement $item */
 
 				// Filter text:p elements
@@ -1143,7 +1143,7 @@ class Ods extends BaseReader
 					StringHelper::stringIncrement($columnID);
 				}
 
-				if (!$this->getReadFilter()->readCell($columnID, $rowID, $worksheetName)) {
+				if (!$this->readFilter->readCell($columnID, $rowID, $worksheetName)) {
 					continue;
 				}
 
@@ -1223,7 +1223,7 @@ class Ods extends BaseReader
 		bool $processWidths = true,
 		bool $processStyles = true
 	): void {
-		foreach ($childNode->childNodes as $grandchildNode) {
+		foreach ($childNode->childNodes ?? [] as $grandchildNode) {
 			/** @var DOMElement $grandchildNode */
 			$grandkey = self::extractNodeName($grandchildNode->nodeName);
 			switch ($grandkey) {
@@ -1255,7 +1255,7 @@ class Ods extends BaseReader
 		bool $processWidths = true,
 		bool $processStyles = true
 	): void {
-		foreach ($childNode->childNodes as $grandchildNode) {
+		foreach ($childNode->childNodes ?? [] as $grandchildNode) {
 			/** @var DOMElement $grandchildNode */
 			$grandkey = self::extractNodeName($grandchildNode->nodeName);
 			switch ($grandkey) {
@@ -1432,7 +1432,7 @@ class Ods extends BaseReader
 	protected function scanElementForText(DOMNode $element): string
 	{
 		$str = '';
-		foreach ($element->childNodes as $child) {
+		foreach ($element->childNodes ?? [] as $child) {
 			/** @var DOMNode $child */
 			if ($child->nodeType == XML_TEXT_NODE) {
 				$str .= $child->nodeValue;
@@ -1511,11 +1511,11 @@ class Ods extends BaseReader
 		}
 	}
 
-	/** @var null|Closure(string, string):string */
-	private ?Closure $formatCallback = null;
+	/** @var null|callable(string, string):string format callback routine */
+	private $formatCallback;
 
-	/** @param Closure(string, string):string $formatCallback */
-	public function setFormatCallback(Closure $formatCallback): void
+	/** @param callable(string, string):string $formatCallback format callback routine */
+	public function setFormatCallback(callable $formatCallback): void
 	{
 		$this->formatCallback = $formatCallback;
 	}
@@ -1650,6 +1650,7 @@ class Ods extends BaseReader
 	/** @return array{
 	 *   horizontal?: string,
 	 *   readOrder?: int,
+	 *   indent?: int,
 	 * }
 	 */
 	protected function getAlignment2Styles(DOMElement $paragraphProperties, string $styleNs, string $fontNs): array
