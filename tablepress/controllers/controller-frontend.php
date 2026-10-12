@@ -8,6 +8,8 @@
  * @since 1.0.0
  */
 
+declare(strict_types=1);
+
 // Prohibit direct script loading.
 defined( 'ABSPATH' ) || die( 'No direct script access allowed!' );
 
@@ -92,7 +94,7 @@ class TablePress_Frontend_Controller extends TablePress_Controller {
 		}
 
 		// Register a placeholder script handle so that plugins can properly declare it as a dependency, even before the actual script is enqueued in `enqueue_datatables_files()`.
-		wp_register_script( 'tablepress-datatables', '', array(), TablePress::version, array( 'in_footer' => true ) );
+		wp_register_script( 'tablepress-datatables', '', array(), TablePress::version, array( 'in_footer' => true ) ); // @phpstan-ignore argument.type ($src is empty, as it's a placeholder.)
 
 		add_action( 'wp_print_footer_scripts', array( $this, 'add_datatables_calls' ), 9 ); // Priority 9 so that this runs before `_wp_footer_scripts()`.
 
@@ -321,6 +323,8 @@ class TablePress_Frontend_Controller extends TablePress_Controller {
 		 * @since 3.0.0
 		 *
 		 * @param string[] $dependencies The dependencies for the DataTables JS library.
+		 *
+		 * @phpstan-param non-empty-string[] $dependencies
 		 */
 		$dependencies = apply_filters( 'tablepress_datatables_js_dependencies', $dependencies );
 
@@ -1031,9 +1035,10 @@ class TablePress_Frontend_Controller extends TablePress_Controller {
 					$output -= $table['options']['table_head'];
 					$output -= $table['options']['table_foot'];
 				}
+				$output = (string) $output;
 				break;
 			case 'number_columns':
-				$output = count( $table['data'][0] );
+				$output = (string) count( $table['data'][0] );
 				break;
 			default:
 				$output = "&#91;table-info field “{$field}” not found in table “{$table_id}” /&#93;<br />\n";
@@ -1119,8 +1124,9 @@ class TablePress_Frontend_Controller extends TablePress_Controller {
 			}
 
 			foreach ( $search_terms as $search_term ) {
-				if ( ( $table['options']['print_name'] && false !== $fn_stripos( $table['name'], (string) $search_term ) )
-					|| ( $table['options']['print_description'] && false !== $fn_stripos( $table['description'], (string) $search_term ) ) ) {
+				$search_term = (string) $search_term;
+				if ( ( $table['options']['print_name'] && false !== $fn_stripos( $table['name'], $search_term ) )
+					|| ( $table['options']['print_description'] && false !== $fn_stripos( $table['description'], $search_term ) ) ) {
 					// Found the search term in the name or description (and they are shown).
 					$query_result[ $search_term ][] = $table_id; // Add table ID to result list.
 					// No need to continue searching this search term in this table.
@@ -1139,7 +1145,7 @@ class TablePress_Frontend_Controller extends TablePress_Controller {
 							continue;
 						}
 						// @todo Cells are not evaluated here, so math formulas are searched.
-						if ( false !== $fn_stripos( $table_cell, (string) $search_term ) ) {
+						if ( false !== $fn_stripos( (string) $table_cell, $search_term ) ) { // The type casting is necessary to prevent PHP errors with cells that are (still) integer, which can happen with tables that have not been edited with TablePress 2.0+.
 							// Found the search term in the cell content.
 							$query_result[ $search_term ][] = $table_id; // Add table ID to result list
 							// No need to continue searching this search term in this table.

@@ -40,11 +40,6 @@ body.wait * {
 #tablepress-page {
 	margin: 0 0 0 -20px;
 
-	/* Add space between WP core update nag and header navigation. */
-	.update-nag ~ & {
-		margin-top: 25px;
-	}
-
 	#tablepress-body {
 		padding: 0 20px;
 	}
@@ -275,6 +270,9 @@ body.wait * {
 		&.notice-info {
 			border-left-color: var(--wp-components-color-accent, var(--wp-admin-theme-color, #3858e9));
 		}
+		&.notice-error {
+			background-color: #fcf0f0;
+		}
 		.components-notice__content {
 			margin: 0;
 		}
@@ -306,7 +304,6 @@ body.wait * {
 	.components-snackbar-list {
 		position: fixed;
 		bottom: 24px;
-		padding-left: 4px;
 	}
 }
 

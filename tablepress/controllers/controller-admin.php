@@ -8,6 +8,8 @@
  * @since 1.0.0
  */
 
+declare(strict_types=1);
+
 // Prohibit direct script loading.
 defined( 'ABSPATH' ) || die( 'No direct script access allowed!' );
 
@@ -1006,8 +1008,7 @@ class TablePress_Admin_Controller extends TablePress_Controller {
 		if ( empty( $export['format'] ) || ! isset( $exporter->export_formats[ $export['format'] ] ) ) {
 			TablePress::redirect( array( 'action' => 'export', 'message' => 'error_export', 'error_details' => 'The export format is invalid.' ) );
 		}
-		if ( empty( $export['csv_delimiter'] ) ) {
-			// Set a value, so that the variable exists.
+		if ( ! isset( $export['csv_delimiter'] ) ) {
 			$export['csv_delimiter'] = '';
 		}
 		if ( 'csv' === $export['format'] && ! isset( $exporter->csv_delimiters[ $export['csv_delimiter'] ] ) ) {
@@ -1053,7 +1054,11 @@ class TablePress_Admin_Controller extends TablePress_Controller {
 			$download_filename = apply_filters( 'tablepress_export_filename', $download_filename, $table['id'], $table['name'], $export['format'], $export_to_zip );
 			$download_filename = sanitize_file_name( $download_filename );
 			// Export the table.
-			$export_data = $exporter->export_table( $table, $export['format'], $export['csv_delimiter'] );
+			$options = array();
+			if ( 'csv' === $export['format'] ) {
+				$options['csv_delimiter'] = $export['csv_delimiter'];
+			}
+			$export_data = $exporter->export_table( $table, $export['format'], $options );
 			/**
 			 * Filters the exported table data.
 			 *
@@ -1099,7 +1104,11 @@ class TablePress_Admin_Controller extends TablePress_Controller {
 				if ( isset( $table['is_corrupted'] ) && $table['is_corrupted'] ) {
 					continue;
 				}
-				$export_data = $exporter->export_table( $table, $export['format'], $export['csv_delimiter'] );
+				$options = array();
+				if ( 'csv' === $export['format'] ) {
+					$options['csv_delimiter'] = $export['csv_delimiter'];
+				}
+				$export_data = $exporter->export_table( $table, $export['format'], $options );
 				/** This filter is documented in controllers/controller-admin.php */
 				$export_data = apply_filters( 'tablepress_export_data', $export_data, $table, $export['format'], $export['csv_delimiter'] );
 				$export_filename = sprintf( '%1$s-%2$s-%3$s.%4$s', $table['id'], $table['name'], wp_date( 'Y-m-d' ), $export['format'] );
